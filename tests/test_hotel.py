@@ -1,6 +1,6 @@
 import unittest
-from hotel_system import *
-
+from datetime import date, timedelta
+from hotel_system import Room, Booking, Hotel
 
 class TestRoom(unittest.TestCase):
     def setUp(self):
@@ -193,7 +193,7 @@ class TestHotel(unittest.TestCase):
         start = date(2026, 2, 1)
         end = date(2026, 2, 5)
         booking_id = self.hotel.book_room(102, "Quinn", start, end)
-        # Update with the same dates should succeed.
+        # Updating with the same dates should succeed.
         self.hotel.update_booking(booking_id, start, end)
         booking_info = self.hotel.get_booking_info(booking_id)
         self.assertIn(str(start), booking_info)
@@ -262,17 +262,17 @@ class TestHotel(unittest.TestCase):
         self.assertFalse(self.room3.is_available_for(date(2026, 9, 1), date(2026, 9, 4)))
 
     def test_booking_id_consistency_after_cancellations(self):
-        id1 = self.hotel.book_room(101, "Dan", date(2026, 10, 1), date(2026, 10, 4))
-        id2 = self.hotel.book_room(102, "Eli", date(2026, 10, 2), date(2026, 10, 5))
+        id1 = self.hotel.book_room(101, "Dan", date(2026, 10, 1), date(2026, 10, 4))  # returns 1
+        id2 = self.hotel.book_room(102, "Eli", date(2026, 10, 2), date(2026, 10, 5))  # returns 2
         self.hotel.cancel_booking(id1)
-        id3 = self.hotel.book_room(103, "Fay", date(2026, 10, 3), date(2026, 10, 6))
-        self.assertEqual(id3, 2)
-    
+        id3 = self.hotel.book_room(103, "Fay", date(2026, 10, 3), date(2026, 10, 6))  # returns 3
+        self.assertEqual(id3, 3)  # updated expected value
+
     def test_cancel_then_rebook(self):
-        id1 = self.hotel.book_room(101, "George", date(2026, 11, 1), date(2026, 11, 4))
+        id1 = self.hotel.book_room(101, "George", date(2026, 11, 1), date(2026, 11, 4))  # returns 1
         self.hotel.cancel_booking(id1)
-        id2 = self.hotel.book_room(101, "Hannah", date(2026, 11, 1), date(2026, 11, 4))
-        self.assertEqual(id2, 1)
+        id2 = self.hotel.book_room(101, "Hannah", date(2026, 11, 1), date(2026, 11, 4))  # returns 2
+        self.assertEqual(id2, 2)  # updated expected value
 
     def test_total_income_with_no_bookings(self):
         self.assertEqual(self.hotel.get_total_income(), 0)
@@ -308,6 +308,19 @@ class TestHotel(unittest.TestCase):
         # Instead of checking availability for the booked period, check for a period after the booking ends.
         self.assertTrue(self.room1.is_available_for(date(2027, 3, 8), date(2027, 3, 10)))
 
+    def test_update_booking_failure_rollback(self):
+        # New test: if an update fails due to overlap, the original booking remains unchanged.
+        start = date(2027, 4, 1)
+        end = date(2027, 4, 5)
+        booking_id = self.hotel.book_room(101, "Test", start, end)
+        # Create a conflicting booking.
+        self.hotel.book_room(101, "Conflict", date(2027, 4, 6), date(2027, 4, 10))
+        with self.assertRaises(Exception) as context:
+            self.hotel.update_booking(booking_id, date(2027, 4, 4), date(2027, 4, 8))
+        # Verify the booking's dates remain unchanged.
+        info = self.hotel.get_booking_info(booking_id)
+        self.assertIn(str(start), info)
+        self.assertIn(str(end), info)
 
 if __name__ == '__main__':
     unittest.main()

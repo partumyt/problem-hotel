@@ -12,7 +12,8 @@ class Room:
     def is_available_for(self, start_date, end_date):
         # Check if the room is available for the date range [start_date, end_date)
         for booking in self.bookings:
-            # If the booking overlaps with the requested range, return False
+            # Bookings do not overlap if the requested end date is on or before a booking's start,
+            # or the requested start date is on or after a booking's end.
             if not (end_date <= booking.start_date or start_date >= booking.end_date):
                 return False
         return True
@@ -48,11 +49,14 @@ class Booking:
 class Hotel:
     def __init__(self, name, rooms):
         self.name = name
-        self.rooms = rooms
+        self.rooms = rooms  # List of Room objects
         self.bookings = {}  # Mapping booking_id to Booking objects
+        self.next_booking_id = 1  # Unique booking ID counter
 
     def generate_booking_id(self):
-        return len(self.bookings) + 1
+        booking_id = self.next_booking_id
+        self.next_booking_id += 1
+        return booking_id
 
     def book_room(self, room_number, guest_name, start_date, end_date):
         room = next((r for r in self.rooms if r.number == room_number), None)
@@ -84,7 +88,8 @@ class Hotel:
         if booking_id not in self.bookings:
             raise Exception("Booking not found")
         b = self.bookings[booking_id]
-        return f"Booking {b.booking_id} for room {b.room.number} by {b.guest_name} from {b.start_date} to {b.end_date} for {b.total_price:.2f}"
+        return (f"Booking {b.booking_id} for room {b.room.number} by {b.guest_name} "
+                f"from {b.start_date} to {b.end_date} for {b.total_price:.2f}")
 
     def report(self):
         # Report: number of bookings per room
@@ -95,11 +100,14 @@ class Hotel:
             raise Exception("Booking not found")
         booking = self.bookings[booking_id]
         room = booking.room
-        # Temporarily remove the booking from the room's bookings list
+        # Temporarily remove the booking from the room's list
         room.bookings.remove(booking)
         if not room.is_available_for(new_start_date, new_end_date):
             room.bookings.append(booking)
             raise Exception("Room not available for the new selected dates")
-        # Update the booking's dates
-        booking.update_dates(new_start_date, new_end_date)
+        try:
+            booking.update_dates(new_start_date, new_end_date)
+        except Exception as e:
+            room.bookings.append(booking)
+            raise e
         room.bookings.append(booking)
